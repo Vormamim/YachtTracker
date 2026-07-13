@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Greek Yacht Market — 38–43 ft</title>
+<title>Yacht Market — 38–43 ft</title>
 <style>
   :root {
     --page:        #f9f9f7;
@@ -91,12 +91,15 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>Greek Yacht Market</h1>
-    <p class="sub" id="subtitle">Sailing yachts 38–43 ft listed for sale in Greece</p>
+    <h1>Yacht Market</h1>
+    <p class="sub" id="subtitle">Sailing yachts 38–43 ft listed for sale</p>
   </header>
 
-  <div class="filters" id="filters" hidden>
-    <label>Source
+  <div class="filters" id="filters">
+    <label>Region
+      <select id="regSel"><option value="">All regions</option></select>
+    </label>
+    <label id="srcWrap" hidden>Source
       <select id="srcSel"><option value="">All sources</option></select>
     </label>
   </div>
@@ -180,6 +183,7 @@ const fmtEUR  = v => v == null ? "—" : "€" + Math.round(v).toLocaleString("e
 const fmtEURc = v => v >= 1e6 ? "€" + (v / 1e6).toFixed(1) + "M"
                  : v >= 1e3 ? "€" + Math.round(v / 1e3) + "k" : "€" + Math.round(v);
 const fmtDate = d => new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 function niceTicks(lo, hi, n = 4) {
   if (hi === lo) hi = lo + 1;
@@ -219,9 +223,11 @@ const hideTip = () => { tip.style.display = "none"; };
 
 /* ---------- state ---------- */
 let ALL = [];          // every CSV row
-let sourceFilter = "";
+let sourceFilter = "", regionFilter = "";
 
-const filtered = () => sourceFilter ? ALL.filter(r => r.source === sourceFilter) : ALL;
+const filtered = () => ALL.filter(r =>
+  (!regionFilter || r.region === regionFilter) &&
+  (!sourceFilter || r.source === sourceFilter));
 
 function snapshots(rows) {
   const dates = [...new Set(rows.map(r => r.run_date))].sort();
@@ -359,7 +365,7 @@ function renderScatter(rows) {
     if (nearest) showTip(e.clientX, e.clientY, [
       [fmtEUR(nearest.y), "tt-value"],
       [nearest.r.title, "tt-label"],
-      [`${nearest.x} · ${nearest.r.length_ft} ft`, "tt-label"],
+      [`${nearest.x} · ${nearest.r.length_ft} ft · ${cap(nearest.r.region)}`, "tt-label"],
     ]);
     else hideTip();
   });
@@ -376,7 +382,7 @@ function renderTrend(containerId, rows, valueOf, fmt) {
   const pts = dates.map(d => ({ d, v: valueOf(at(d)) })).filter(p => p.v != null);
   if (!pts.length) return;
 
-  const { svg, plot } = frame(container, 190, 46);
+  const { svg, plot } = frame(container, 196, 46, 12, 22);
   const ys = pts.map(p => p.v);
   const yT = niceTicks(Math.min(0, ...ys), Math.max(...ys));
   const yr = [yT[0], yT[yT.length - 1]];
@@ -438,6 +444,7 @@ function renderTable(rows) {
     ["length_ft", "Length (ft)", true],
     ["year", "Year", true],
     ["first_seen", "First seen", false],
+    ["region", "Region", false],
     ["source", "Source", false],
   ];
   const data = latest.map(r => ({ ...r, first_seen: firstSeen[r.listing_id] }));
@@ -483,6 +490,7 @@ function renderTable(rows) {
       [r.length_ft || "—", true],
       [r.year || "—", true],
       [r.first_seen ? fmtDate(r.first_seen) : "—", false],
+      [cap(r.region), false],
       [r.source, false],
     ];
     for (const [txt, num] of cells) {
@@ -520,14 +528,21 @@ async function boot() {
   }
   const { dates } = snapshots(ALL);
   const sources = [...new Set(ALL.map(r => r.source))].sort();
+  const regions = [...new Set(ALL.map(r => r.region).filter(Boolean))].sort();
   document.getElementById("subtitle").textContent =
-    `Sailing yachts 38–43 ft for sale in Greece · last crawl ${fmtDate(dates[dates.length - 1])} · ${sources.join(", ")}`;
+    `Sailing yachts 38–43 ft for sale · ${regions.map(cap).join(", ")} · last crawl ${fmtDate(dates[dates.length - 1])} · ${sources.join(", ")}`;
+  const regSel = document.getElementById("regSel");
+  for (const rg of regions) {
+    const o = document.createElement("option");
+    o.value = rg; o.textContent = cap(rg); regSel.appendChild(o);
+  }
+  regSel.addEventListener("change", () => { regionFilter = regSel.value; renderAll(); });
   const sel = document.getElementById("srcSel");
   for (const s of sources) {
     const o = document.createElement("option");
     o.value = s; o.textContent = s; sel.appendChild(o);
   }
-  if (sources.length > 1) document.getElementById("filters").hidden = false;
+  if (sources.length > 1) document.getElementById("srcWrap").hidden = false;
   sel.addEventListener("change", () => { sourceFilter = sel.value; renderAll(); });
 
   renderAll();

@@ -18,6 +18,7 @@ class Listing:
     year: int | None
     url: str
     source: str
+    region: str = ""
 
     @staticmethod
     def make_id(url: str) -> str:

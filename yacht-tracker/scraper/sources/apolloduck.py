@@ -1,4 +1,4 @@
-"""Apollo Duck adapter — sailing yachts located in Greece, 38–43 ft.
+"""Apollo Duck adapter — sailing yachts 38–43 ft, by region.
 
 Verified against the live site 2026-07-13: the country portals
 (greece.apolloduck.com) no longer resolve; search goes through
@@ -11,10 +11,12 @@ from bs4 import BeautifulSoup
 from .base import BaseSource, parse_price_eur, parse_length_ft, parse_year
 from ..pipeline import Listing, in_range, today
 
+REGIONS = {"greece": "gr", "turkey": "tr", "croatia": "hr"}
+
 PAGE_SIZE = 50
 SEARCH_URL = (
     "https://www.apolloduck.com/listings.phtml"
-    "?view=1&layout=1&fx=EUR&rid=gr&cid=2&type=1"
+    "?view=1&layout=1&fx=EUR&rid={rid}&cid=2&type=1"
     "&minl=1158.24&maxl=1310.64"  # 38–43 ft in cm
     "&sort=0&limit={limit}&next={offset}"
 )
@@ -27,14 +29,19 @@ PRICE = "span._FeaturePrice"
 class ApolloDuck(BaseSource):
     name = "apolloduck"
 
+    def __init__(self, region: str):
+        super().__init__()
+        self.region = region
+        self.rid = REGIONS[region]
+
     def fetch(self, max_pages: int = 5, debug: bool = False) -> list[Listing]:
         out, run, seen = [], today(), set()
         for page in range(max_pages):
-            url = SEARCH_URL.format(limit=PAGE_SIZE, offset=page * PAGE_SIZE)
+            url = SEARCH_URL.format(rid=self.rid, limit=PAGE_SIZE, offset=page * PAGE_SIZE)
             soup = BeautifulSoup(self.get(url).text, "html.parser")
             cards = soup.select(CARD)
             if debug and cards:
-                print(f"--- {self.name} first card HTML ---\n{cards[0].prettify()[:3000]}")
+                print(f"--- {self.name}/{self.region} first card HTML ---\n{cards[0].prettify()[:3000]}")
             if not cards:
                 break
             for c in cards:
@@ -69,5 +76,6 @@ class ApolloDuck(BaseSource):
                     year=parse_year(specs.get("Year", "")),
                     url=url,
                     source=self.name,
+                    region=self.region,
                 ))
         return out
