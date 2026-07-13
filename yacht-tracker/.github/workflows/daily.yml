@@ -1,0 +1,26 @@
+name: daily-crawl
+on:
+  schedule:
+    - cron: "0 3 * * *"   # 03:00 UTC ≈ 05–06:00 Greece, 13:00 Sydney
+  workflow_dispatch: {}    # manual trigger button
+
+permissions:
+  contents: write
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python main.py
+      - name: Commit data
+        run: |
+          git config user.name "yacht-bot"
+          git config user.email "actions@github.com"
+          git add data/listings.csv
+          git diff --cached --quiet || git commit -m "crawl $(date -u +%F)"
+          git push
