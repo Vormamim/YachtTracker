@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Greek Yacht Market — 38–43 ft</title>
+<style>
+  :root {
+    --page:        #f9f9f7;
+    --surface-1:   #fcfcfb;
+    --text-primary:#0b0b0b;
+    --text-secondary:#52514e;
+    --muted:       #898781;
+    --grid:        #e1e0d9;
+    --baseline:    #c3c2b7;
+    --border:      rgba(11,11,11,0.10);
+    --series-1:    #2a78d6;
+    --delta-good:  #006300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page:        #0d0d0d;
+      --surface-1:   #1a1a19;
+      --text-primary:#ffffff;
+      --text-secondary:#c3c2b7;
+      --muted:       #898781;
+      --grid:        #2c2c2a;
+      --baseline:    #383835;
+      --border:      rgba(255,255,255,0.10);
+      --series-1:    #3987e5;
+      --delta-good:  #0ca30c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--text-primary);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 20px 48px; }
+  header h1 { font-size: 22px; font-weight: 650; margin: 0 0 2px; }
+  header .sub { color: var(--text-secondary); margin: 0 0 20px; }
+  .filters { display: flex; gap: 12px; align-items: center; margin: 0 0 16px; }
+  .filters label { color: var(--text-secondary); }
+  .filters select {
+    font: inherit; color: var(--text-primary); background: var(--surface-1);
+    border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px;
+  }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .tile {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .tile .label { color: var(--text-secondary); font-size: 13px; }
+  .tile .value { font-size: 28px; font-weight: 600; margin-top: 2px; }
+  .tile .delta { font-size: 12.5px; color: var(--text-secondary); margin-top: 2px; }
+  .tile .delta .up { color: var(--delta-good); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px; margin-bottom: 12px;
+  }
+  .card h2 { font-size: 14.5px; font-weight: 600; margin: 0 0 2px; }
+  .card .note { color: var(--muted); font-size: 12.5px; margin: 0 0 8px; }
+  .chart { width: 100%; }
+  svg { display: block; }
+  svg text { font: 11.5px system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  svg .endlabel { fill: var(--text-secondary); font-weight: 600; }
+  #tooltip {
+    position: fixed; pointer-events: none; z-index: 10; display: none;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.14); max-width: 260px;
+  }
+  #tooltip .tt-value { font-weight: 650; font-size: 14px; }
+  #tooltip .tt-label { color: var(--text-secondary); font-size: 12.5px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--grid); }
+  th {
+    color: var(--text-secondary); font-weight: 600; font-size: 12.5px;
+    cursor: pointer; user-select: none; white-space: nowrap;
+  }
+  th .arrow { color: var(--muted); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td a { color: var(--series-1); text-decoration: none; }
+  td a:hover { text-decoration: underline; }
+  .tablewrap { overflow-x: auto; }
+  footer { color: var(--muted); font-size: 12.5px; margin-top: 8px; }
+  footer a { color: var(--text-secondary); }
+  #err { color: var(--text-secondary); padding: 24px; text-align: center; display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Greek Yacht Market</h1>
+    <p class="sub" id="subtitle">Sailing yachts 38–43 ft listed for sale in Greece</p>
+  </header>
+
+  <div class="filters" id="filters" hidden>
+    <label>Source
+      <select id="srcSel"><option value="">All sources</option></select>
+    </label>
+  </div>
+
+  <div id="err"></div>
+
+  <section class="tiles" id="tiles"></section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Asking price distribution</h2>
+      <p class="note" id="histNote"></p>
+      <div class="chart" id="hist"></div>
+    </div>
+    <div class="card">
+      <h2>Price vs build year</h2>
+      <p class="note" id="scatterNote"></p>
+      <div class="chart" id="scatter"></div>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Boats on market</h2>
+      <p class="note">per daily crawl</p>
+      <div class="chart" id="countTrend"></div>
+    </div>
+    <div class="card">
+      <h2>Median asking price</h2>
+      <p class="note">per daily crawl, EUR-priced listings</p>
+      <div class="chart" id="priceTrend"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>All listings</h2>
+    <p class="note" id="tblNote"></p>
+    <div class="tablewrap"><table id="tbl"></table></div>
+  </section>
+
+  <footer>
+    Data crawled daily by <a href="https://github.com/Vormamim/YachtTracker">YachtTracker</a>.
+    Unpriced rows are listings quoted in a non-EUR currency.
+  </footer>
+</div>
+<div id="tooltip"></div>
+
+<script>
+"use strict";
+/* ---------- data loading ---------- */
+const CSV_URL = "yacht-tracker/data/listings.csv";
+
+function parseCSV(text) {
+  const rows = []; let row = [], field = "", inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(field); field = "";
+      if (row.length > 1 || row[0] !== "") rows.push(row);
+      row = [];
+    } else field += c;
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  const head = rows.shift();
+  return rows.map(r => Object.fromEntries(head.map((h, i) => [h, r[i] ?? ""])));
+}
+
+/* ---------- helpers ---------- */
+const median = a => {
+  if (!a.length) return null;
+  const s = [...a].sort((x, y) => x - y), m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+const fmtEUR  = v => v == null ? "—" : "€" + Math.round(v).toLocaleString("en-US");
+const fmtEURc = v => v >= 1e6 ? "€" + (v / 1e6).toFixed(1) + "M"
+                 : v >= 1e3 ? "€" + Math.round(v / 1e3) + "k" : "€" + Math.round(v);
+const fmtDate = d => new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+function niceTicks(lo, hi, n = 4) {
+  if (hi === lo) hi = lo + 1;
+  const span = hi - lo, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => span / s <= n + 1) || 10 * mag;
+  const t = []; // cover the full range: first tick <= lo, last tick >= hi
+  for (let v = Math.floor(lo / step) * step; v < hi + step - 1e-9; v += step) t.push(v);
+  return t;
+}
+const svgNS = "http://www.w3.org/2000/svg";
+function el(name, attrs, parent) {
+  const e = document.createElementNS(svgNS, name);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function roundedTopBar(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h);
+  return `M${x},${y + h} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + w - r},${y} Q${x + w},${y} ${x + w},${y + r} L${x + w},${y + h} Z`;
+}
+
+/* ---------- tooltip (textContent only — CSV values are untrusted) ---------- */
+const tip = document.getElementById("tooltip");
+function showTip(clientX, clientY, lines) {
+  tip.replaceChildren(...lines.map(([txt, cls]) => {
+    const d = document.createElement("div");
+    d.className = cls; d.textContent = txt; return d;
+  }));
+  tip.style.display = "block";
+  const r = tip.getBoundingClientRect();
+  let x = clientX + 14, y = clientY + 14;
+  if (x + r.width > innerWidth - 8) x = clientX - r.width - 14;
+  if (y + r.height > innerHeight - 8) y = clientY - r.height - 14;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+const hideTip = () => { tip.style.display = "none"; };
+
+/* ---------- state ---------- */
+let ALL = [];          // every CSV row
+let sourceFilter = "";
+
+const filtered = () => sourceFilter ? ALL.filter(r => r.source === sourceFilter) : ALL;
+
+function snapshots(rows) {
+  const dates = [...new Set(rows.map(r => r.run_date))].sort();
+  return { dates, at: d => rows.filter(r => r.run_date === d) };
+}
+
+/* ---------- stat tiles ---------- */
+function renderTiles(rows) {
+  const { dates, at } = snapshots(rows);
+  const latest = at(dates[dates.length - 1] || "");
+  const prev = dates.length > 1 ? at(dates[dates.length - 2]) : null;
+  const prices = latest.map(r => +r.price_eur).filter(v => v > 0);
+  const years = latest.map(r => +r.year).filter(v => v > 0);
+
+  let newN = null, goneN = null;
+  if (prev) {
+    const prevIds = new Set(prev.map(r => r.listing_id));
+    const curIds = new Set(latest.map(r => r.listing_id));
+    newN = latest.filter(r => !prevIds.has(r.listing_id)).length;
+    goneN = prev.filter(r => !curIds.has(r.listing_id)).length;
+  }
+
+  const tiles = [
+    ["On market", String(latest.length),
+      prev ? `+${newN} new · −${goneN} delisted vs previous crawl` : "first crawl — deltas appear tomorrow"],
+    ["Median asking price", fmtEUR(median(prices)), `${prices.length} EUR-priced listings`],
+    ["Median build year", years.length ? String(Math.round(median(years))) : "—", ""],
+    ["Crawls recorded", String(dates.length), dates.length ? `since ${fmtDate(dates[0])}` : ""],
+  ];
+  document.getElementById("tiles").replaceChildren(...tiles.map(([label, value, delta]) => {
+    const t = document.createElement("div"); t.className = "tile";
+    for (const [cls, txt] of [["label", label], ["value", value], ["delta", delta]]) {
+      if (!txt) continue;
+      const d = document.createElement("div"); d.className = cls; d.textContent = txt; t.appendChild(d);
+    }
+    return t;
+  }));
+}
+
+/* ---------- chart frame ---------- */
+function frame(container, height, padL, padR = 12, padT = 12, padB = 26) {
+  container.replaceChildren();
+  const width = container.clientWidth || 320;
+  const svg = el("svg", { width, height, viewBox: `0 0 ${width} ${height}` }, container);
+  return { svg, width, height, plot: { x: padL, y: padT, w: width - padL - padR, h: height - padT - padB } };
+}
+function yAxis(svg, plot, ticks, fmt) {
+  for (const v of ticks.pos) {
+    el("line", { x1: plot.x, x2: plot.x + plot.w, y1: v.y, y2: v.y, stroke: css("--grid"), "stroke-width": 1 }, svg);
+    const t = el("text", { x: plot.x - 6, y: v.y + 4, "text-anchor": "end" }, svg);
+    t.textContent = fmt(v.v);
+  }
+  el("line", { x1: plot.x, x2: plot.x + plot.w, y1: plot.y + plot.h, y2: plot.y + plot.h, stroke: css("--baseline"), "stroke-width": 1 }, svg);
+}
+
+/* ---------- histogram ---------- */
+function renderHist(rows) {
+  const container = document.getElementById("hist");
+  const { dates, at } = snapshots(rows);
+  const latest = at(dates[dates.length - 1] || "");
+  const prices = latest.map(r => +r.price_eur).filter(v => v > 0);
+  const unpriced = latest.length - prices.length;
+  document.getElementById("histNote").textContent =
+    `latest crawl · ${prices.length} priced` + (unpriced ? ` · ${unpriced} non-EUR not shown` : "");
+  if (!prices.length) return;
+
+  const binW = [10e3, 20e3, 25e3, 50e3, 100e3].find(w => (Math.max(...prices) - Math.min(...prices)) / w <= 14) || 100e3;
+  const lo = Math.floor(Math.min(...prices) / binW) * binW;
+  const bins = [];
+  for (let b = lo; b <= Math.max(...prices); b += binW) bins.push({ lo: b, hi: b + binW, n: 0 });
+  for (const p of prices) bins[Math.min(bins.length - 1, Math.floor((p - lo) / binW))].n++;
+
+  const { svg, plot } = frame(container, 220, 34);
+  const maxN = Math.max(...bins.map(b => b.n));
+  const yTicks = niceTicks(0, maxN).filter(v => Number.isInteger(v));
+  const yPos = v => plot.y + plot.h - (v / (yTicks[yTicks.length - 1] || 1)) * plot.h;
+  yAxis(svg, plot, { pos: yTicks.map(v => ({ v, y: yPos(v) })) }, v => v);
+
+  const slot = plot.w / bins.length;
+  const barW = Math.min(24, slot - 2);
+  bins.forEach((b, i) => {
+    const x = plot.x + i * slot + (slot - barW) / 2;
+    const h = plot.h - (yPos(b.n) - plot.y);
+    if (b.n > 0)
+      el("path", { d: roundedTopBar(x, yPos(b.n), barW, h, 4), fill: css("--series-1") }, svg);
+    const hit = el("rect", { x: plot.x + i * slot, y: plot.y, width: slot, height: plot.h, fill: "transparent" }, svg);
+    hit.addEventListener("pointermove", e => showTip(e.clientX, e.clientY, [
+      [`${b.n} boat${b.n === 1 ? "" : "s"}`, "tt-value"],
+      [`${fmtEURc(b.lo)} – ${fmtEURc(b.hi)}`, "tt-label"],
+    ]));
+    hit.addEventListener("pointerleave", hideTip);
+    if (i % 2 === 0) {
+      const t = el("text", { x: plot.x + i * slot, y: plot.y + plot.h + 16, "text-anchor": "middle" }, svg);
+      t.textContent = fmtEURc(b.lo);
+    }
+  });
+}
+
+/* ---------- scatter ---------- */
+function renderScatter(rows) {
+  const container = document.getElementById("scatter");
+  const { dates, at } = snapshots(rows);
+  const latest = at(dates[dates.length - 1] || "");
+  const pts = latest.filter(r => +r.price_eur > 0 && +r.year > 0)
+    .map(r => ({ x: +r.year, y: +r.price_eur, r }));
+  document.getElementById("scatterNote").textContent = `latest crawl · ${pts.length} listings · click a dot to open`;
+  if (!pts.length) return;
+
+  const { svg, plot } = frame(container, 220, 46, 22);
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const xT = niceTicks(Math.min(...xs), Math.max(...xs), 5);
+  const yT = niceTicks(0, Math.max(...ys));
+  const xr = [xT[0], xT[xT.length - 1]], yr = [0, yT[yT.length - 1]];
+  const X = v => plot.x + (v - xr[0]) / (xr[1] - xr[0] || 1) * plot.w;
+  const Y = v => plot.y + plot.h - (v - yr[0]) / (yr[1] - yr[0] || 1) * plot.h;
+  yAxis(svg, plot, { pos: yT.map(v => ({ v, y: Y(v) })) }, fmtEURc);
+  for (const v of xT) {
+    const t = el("text", { x: X(v), y: plot.y + plot.h + 16, "text-anchor": "middle" }, svg);
+    t.textContent = v;
+  }
+  for (const p of pts)
+    el("circle", { cx: X(p.x), cy: Y(p.y), r: 4.5, fill: css("--series-1"), stroke: css("--surface-1"), "stroke-width": 2 }, svg);
+
+  // nearest-point hover layer (dots are pinpoints; 24px reach)
+  const overlay = el("rect", { x: plot.x, y: plot.y, width: plot.w, height: plot.h, fill: "transparent", cursor: "pointer" }, svg);
+  let nearest = null;
+  overlay.addEventListener("pointermove", e => {
+    const box = svg.getBoundingClientRect();
+    const mx = e.clientX - box.left, my = e.clientY - box.top;
+    nearest = null; let best = 24 * 24;
+    for (const p of pts) {
+      const d = (X(p.x) - mx) ** 2 + (Y(p.y) - my) ** 2;
+      if (d < best) { best = d; nearest = p; }
+    }
+    if (nearest) showTip(e.clientX, e.clientY, [
+      [fmtEUR(nearest.y), "tt-value"],
+      [nearest.r.title, "tt-label"],
+      [`${nearest.x} · ${nearest.r.length_ft} ft`, "tt-label"],
+    ]);
+    else hideTip();
+  });
+  overlay.addEventListener("pointerleave", hideTip);
+  overlay.addEventListener("click", () => {
+    if (nearest && /^https:\/\//.test(nearest.r.url)) window.open(nearest.r.url, "_blank", "noopener");
+  });
+}
+
+/* ---------- trend lines ---------- */
+function renderTrend(containerId, rows, valueOf, fmt) {
+  const container = document.getElementById(containerId);
+  const { dates, at } = snapshots(rows);
+  const pts = dates.map(d => ({ d, v: valueOf(at(d)) })).filter(p => p.v != null);
+  if (!pts.length) return;
+
+  const { svg, plot } = frame(container, 190, 46);
+  const ys = pts.map(p => p.v);
+  const yT = niceTicks(Math.min(0, ...ys), Math.max(...ys));
+  const yr = [yT[0], yT[yT.length - 1]];
+  const X = i => pts.length === 1 ? plot.x + plot.w / 2 : plot.x + i / (pts.length - 1) * plot.w;
+  const Y = v => plot.y + plot.h - (v - yr[0]) / (yr[1] - yr[0] || 1) * plot.h;
+  yAxis(svg, plot, { pos: yT.map(v => ({ v, y: Y(v) })) }, fmt);
+
+  const step = Math.ceil(pts.length / 7);
+  pts.forEach((p, i) => {
+    if (i % step === 0 || i === pts.length - 1) {
+      const t = el("text", { x: X(i), y: plot.y + plot.h + 16, "text-anchor": "middle" }, svg);
+      t.textContent = fmtDate(p.d);
+    }
+  });
+
+  if (pts.length > 1)
+    el("path", {
+      d: pts.map((p, i) => (i ? "L" : "M") + X(i) + "," + Y(p.v)).join(" "),
+      fill: "none", stroke: css("--series-1"), "stroke-width": 2,
+      "stroke-linecap": "round", "stroke-linejoin": "round",
+    }, svg);
+  const last = pts[pts.length - 1];
+  el("circle", { cx: X(pts.length - 1), cy: Y(last.v), r: 4.5, fill: css("--series-1"), stroke: css("--surface-1"), "stroke-width": 2 }, svg);
+  const endT = el("text", {
+    x: Math.min(X(pts.length - 1) + 8, plot.x + plot.w),
+    y: Y(last.v) - 8, "text-anchor": pts.length === 1 ? "middle" : "end", class: "endlabel",
+  }, svg);
+  endT.textContent = fmt(last.v);
+
+  // crosshair + tooltip
+  const hair = el("line", { y1: plot.y, y2: plot.y + plot.h, stroke: css("--baseline"), "stroke-width": 1, visibility: "hidden" }, svg);
+  const overlay = el("rect", { x: plot.x, y: plot.y, width: plot.w, height: plot.h, fill: "transparent" }, svg);
+  overlay.addEventListener("pointermove", e => {
+    const box = svg.getBoundingClientRect();
+    const mx = e.clientX - box.left;
+    let i = 0, best = Infinity;
+    pts.forEach((p, j) => { const d = Math.abs(X(j) - mx); if (d < best) { best = d; i = j; } });
+    hair.setAttribute("x1", X(i)); hair.setAttribute("x2", X(i));
+    hair.setAttribute("visibility", "visible");
+    showTip(e.clientX, e.clientY, [[fmt(pts[i].v), "tt-value"], [fmtDate(pts[i].d), "tt-label"]]);
+  });
+  overlay.addEventListener("pointerleave", () => { hair.setAttribute("visibility", "hidden"); hideTip(); });
+}
+
+/* ---------- table ---------- */
+let sortKey = "price_eur", sortDir = -1;
+function renderTable(rows) {
+  const { dates, at } = snapshots(rows);
+  const latest = at(dates[dates.length - 1] || "");
+  const firstSeen = {};
+  for (const r of ALL) {
+    if (!(r.listing_id in firstSeen) || r.run_date < firstSeen[r.listing_id]) firstSeen[r.listing_id] = r.run_date;
+  }
+  document.getElementById("tblNote").textContent = `latest crawl · ${latest.length} listings`;
+
+  const cols = [
+    ["title", "Boat", false],
+    ["price_eur", "Price", true],
+    ["length_ft", "Length (ft)", true],
+    ["year", "Year", true],
+    ["first_seen", "First seen", false],
+    ["source", "Source", false],
+  ];
+  const data = latest.map(r => ({ ...r, first_seen: firstSeen[r.listing_id] }));
+  data.sort((a, b) => {
+    const [x, y] = [a[sortKey], b[sortKey]];
+    const nx = parseFloat(x), ny = parseFloat(y);
+    const c = !isNaN(nx) && !isNaN(ny) ? nx - ny : String(x).localeCompare(String(y));
+    return c * sortDir;
+  });
+
+  const tbl = document.getElementById("tbl");
+  tbl.replaceChildren();
+  const trh = document.createElement("tr");
+  for (const [key, label, num] of cols) {
+    const th = document.createElement("th");
+    if (num) th.className = "num";
+    th.textContent = label + " ";
+    if (key === sortKey) {
+      const s = document.createElement("span");
+      s.className = "arrow"; s.textContent = sortDir > 0 ? "↑" : "↓";
+      th.appendChild(s);
+    }
+    th.addEventListener("click", () => {
+      if (sortKey === key) sortDir = -sortDir; else { sortKey = key; sortDir = -1; }
+      renderTable(filtered());
+    });
+    trh.appendChild(th);
+  }
+  tbl.appendChild(trh);
+
+  for (const r of data) {
+    const tr = document.createElement("tr");
+    const tdTitle = document.createElement("td");
+    if (/^https:\/\//.test(r.url)) {
+      const a = document.createElement("a");
+      a.href = r.url; a.target = "_blank"; a.rel = "noopener";
+      a.textContent = r.title || "(untitled)";
+      tdTitle.appendChild(a);
+    } else tdTitle.textContent = r.title || "(untitled)";
+    tr.appendChild(tdTitle);
+    const cells = [
+      [r.price_eur > 0 ? fmtEUR(+r.price_eur) : "—", true],
+      [r.length_ft || "—", true],
+      [r.year || "—", true],
+      [r.first_seen ? fmtDate(r.first_seen) : "—", false],
+      [r.source, false],
+    ];
+    for (const [txt, num] of cells) {
+      const td = document.createElement("td");
+      if (num) td.className = "num";
+      td.textContent = txt;
+      tr.appendChild(td);
+    }
+    tbl.appendChild(tr);
+  }
+}
+
+/* ---------- orchestration ---------- */
+function renderAll() {
+  const rows = filtered();
+  renderTiles(rows);
+  renderHist(rows);
+  renderScatter(rows);
+  renderTrend("countTrend", rows, snap => snap.length, v => String(Math.round(v)));
+  renderTrend("priceTrend", rows,
+    snap => median(snap.map(r => +r.price_eur).filter(v => v > 0)), fmtEURc);
+  renderTable(rows);
+}
+
+async function boot() {
+  try {
+    const res = await fetch(CSV_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status} loading ${CSV_URL}`);
+    ALL = parseCSV(await res.text()).filter(r => r.listing_id);
+  } catch (e) {
+    const err = document.getElementById("err");
+    err.style.display = "block";
+    err.textContent = "Could not load listings data — " + e.message;
+    return;
+  }
+  const { dates } = snapshots(ALL);
+  const sources = [...new Set(ALL.map(r => r.source))].sort();
+  document.getElementById("subtitle").textContent =
+    `Sailing yachts 38–43 ft for sale in Greece · last crawl ${fmtDate(dates[dates.length - 1])} · ${sources.join(", ")}`;
+  const sel = document.getElementById("srcSel");
+  for (const s of sources) {
+    const o = document.createElement("option");
+    o.value = s; o.textContent = s; sel.appendChild(o);
+  }
+  if (sources.length > 1) document.getElementById("filters").hidden = false;
+  sel.addEventListener("change", () => { sourceFilter = sel.value; renderAll(); });
+
+  renderAll();
+  let raf;
+  addEventListener("resize", () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(renderAll); });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", renderAll);
+}
+boot();
+</script>
+</body>
+</html>
