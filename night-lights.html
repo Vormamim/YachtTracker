@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Night Lights Flash Cards</title>
+<style>
+  :root {
+    --page:      #070b14;
+    --surface:   #0f1626;
+    --surface-2: #16203a;
+    --text:      #eef1f7;
+    --text-2:    #a9b2c6;
+    --muted:     #6c7690;
+    --border:    rgba(255,255,255,0.10);
+    --accent:    #5aa2ff;
+    --good:      #2fbf71;
+    --bad:       #ff5d5d;
+    --sea:       #0a1426;
+    --sky:       #03060d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--page); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 28px 16px 56px; }
+  h1 { font-size: 24px; margin: 0 0 4px; font-weight: 650; }
+  .sub { color: var(--text-2); margin: 0 0 22px; }
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px; margin-bottom: 16px;
+  }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    border: 1px solid var(--border); background: var(--surface-2);
+    padding: 7px 12px; border-radius: 999px; font-size: 14px;
+  }
+  .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #04101f; font-weight: 600; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+  .toggle { display: flex; gap: 8px; align-items: center; color: var(--text-2); }
+  .btn {
+    border: 1px solid var(--border); background: var(--surface-2);
+    padding: 10px 16px; border-radius: 10px; font-weight: 600;
+  }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #04101f; }
+  .btn.good { background: var(--good); border-color: var(--good); color: #04160c; }
+  .btn.bad { background: var(--bad); border-color: var(--bad); color: #1f0404; }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .ref { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+  .ref div { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; color: var(--text-2); }
+  .ref b { color: var(--text); display: block; margin-bottom: 2px; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: 1px; }
+  .last { color: var(--text-2); font-size: 14px; }
+  footer { color: var(--muted); font-size: 12.5px; margin-top: 18px; }
+
+  /* Modal */
+  .modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,.72);
+    display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10;
+  }
+  .modal.open { display: flex; }
+  .dialog {
+    width: 100%; max-width: 560px; max-height: 100%; overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px;
+  }
+  .dhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; color: var(--text-2); font-size: 14px; }
+  .close { background: none; border: 0; font-size: 22px; line-height: 1; padding: 4px 8px; color: var(--text-2); }
+  .progress { height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; margin-bottom: 14px; }
+  .progress i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+
+  .card { perspective: 1200px; }
+  .card-inner {
+    position: relative; transition: transform .55s; transform-style: preserve-3d;
+    display: grid;
+  }
+  .card.flipped .card-inner { transform: rotateY(180deg); }
+  .face {
+    grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+  }
+  .back { transform: rotateY(180deg); }
+  .scene { display: block; width: 100%; height: auto; background: var(--sky); cursor: pointer; }
+  .face .body { padding: 14px 16px 16px; }
+  .q { font-weight: 600; margin: 0 0 4px; }
+  .hint { color: var(--text-2); font-size: 13.5px; margin: 0; }
+  .ans-title { font-size: 18px; font-weight: 700; margin: 0 0 2px; }
+  .aspect { color: var(--accent); font-size: 14px; margin: 0 0 10px; }
+  .back p { margin: 0 0 8px; font-size: 14.5px; }
+  .mnem { background: rgba(90,162,255,.12); border-left: 3px solid var(--accent); padding: 7px 10px; border-radius: 6px; font-style: italic; }
+  .rule { color: var(--muted); font-size: 12.5px; }
+  .verdict { font-weight: 700; margin-bottom: 8px; }
+  .verdict.good { color: var(--good); } .verdict.bad { color: var(--bad); }
+
+  .choices { display: grid; gap: 8px; margin-top: 12px; }
+  .choice {
+    text-align: left; background: var(--surface-2); border: 1px solid var(--border);
+    padding: 10px 12px; border-radius: 10px; font-size: 14.5px;
+  }
+  .choice:hover:not(:disabled) { border-color: var(--accent); }
+  .choice.right { border-color: var(--good); background: rgba(47,191,113,.15); }
+  .choice.wrong { border-color: var(--bad); background: rgba(255,93,93,.15); }
+  .choice kbd { color: var(--muted); font-size: 12px; margin-right: 8px; }
+  .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
+  .summary h3 { margin: 4px 0 6px; font-size: 20px; }
+  .summary ul { padding-left: 18px; color: var(--text-2); }
+  @media (prefers-reduced-motion: reduce) { .card-inner { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Night Lights Flash Cards</h1>
+  <p class="sub">Practise identifying vessel lights at night for the RYA Day Skipper (COLREGs Part C, Rules 20–31). You see the lights, work out what the vessel is and which way she's heading, then turn the card over.</p>
+
+  <div class="panel">
+    <h2>Deck</h2>
+    <div class="chips" id="cats"></div>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <label class="toggle"><input type="checkbox" id="mc" checked> Multiple-choice guesses (untick to just turn the card)</label>
+      <button class="btn primary" id="start">Start</button>
+    </div>
+    <p class="last" id="last"></p>
+  </div>
+
+  <div class="panel">
+    <h2>Quick reference — arcs of visibility (Rule 21)</h2>
+    <div class="ref">
+      <div><b><span class="dot" style="background:#fff"></span>Masthead</b>White, 225° ahead. Vessels 50 m and over carry a second one, aft and higher.</div>
+      <div><b><span class="dot" style="background:#ff3b3b"></span><span class="dot" style="background:#2bff6a"></span>Sidelights</b>Red to port, green to starboard, each 112.5° from ahead to 22.5° abaft the beam.</div>
+      <div><b><span class="dot" style="background:#fff"></span>Sternlight</b>White, 135° over the stern.</div>
+      <div><b><span class="dot" style="background:#ffc400"></span>Towing light</b>Yellow, same arc as the sternlight, fitted above it.</div>
+      <div><b>All-round</b>Shows 360°. Used for anchor lights and for special-status signals such as NUC, RAM, fishing and pilot.</div>
+    </div>
+  </div>
+  <footer>Based on the International Regulations for Preventing Collisions at Sea (COLREGs), the rules taught in the RYA Day Skipper syllabus. This is a study aid only: check the RYA Day Skipper handbook or the full COLREGs text before relying on anything here.</footer>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="dtitle">
+  <div class="dialog">
+    <div class="dhead">
+      <span id="dtitle">Card 1 of 10</span>
+      <span id="score">Score 0</span>
+      <button class="close" id="close" aria-label="Close">×</button>
+    </div>
+    <div class="progress"><i id="bar"></i></div>
+    <div id="stage"></div>
+  </div>
+</div>
+
+<script>
+/* ---------- Light geometry ----------
+   Scene is 200 x 120. Sea horizon at y=96. Aspects:
+   head  = bow-on (she is heading at you): her green is on YOUR left
+   stbd  = you see her starboard side, bow pointing right
+   port  = you see her port side, bow pointing left
+   stern = you are astern of her                                          */
+const COL = { w:'#ffffff', r:'#ff3b3b', g:'#2bff6a', y:'#ffc400', fy:'#ffc400' };
+
+const mir = a => a === 'port';
+const X = (a, x) => mir(a) ? 200 - x : x;           // port view is the stbd view mirrored
+
+function power(a, long) {
+  if (a === 'stern') return [['w',100,86]];
+  if (a === 'head') {
+    const L = [['w',100,long?58:55], ['g',90,84], ['r',110,84]];
+    if (long) L.push(['w',100,44]);
+    return L;
+  }
+  const L = [['w',X(a,128),long?58:55], [a==='stbd'?'g':'r', X(a,138), 84]];
+  if (long) L.push(['w',X(a,78),44]);
+  return L;
+}
+function sides(a) {
+  if (a === 'stern') return [['w',100,86]];
+  if (a === 'head') return [['g',90,84], ['r',110,84]];
+  return [[a==='stbd'?'g':'r', X(a,138), 84]];
+}
+// Vertical stack of all-round lights, listed top to bottom, bottom one at y=34
+function stack(a, colours, x) {
+  const cx = x ?? (a==='head'||a==='stern' ? 100 : X(a,103));
+  const n = colours.length;
+  return colours.map((c,i) => [c, cx, 34 - 9*(n-1-i)]);
+}
+function towing(a, n) {
+  if (a === 'stern') return [['w',100,86], ['y',100,78]];
+  const x = a==='head' ? 100 : X(a,128);
+  const L = [];
+  for (let i=0;i<n;i++) L.push(['w', x, 55 - 7*i]);
+  return L.concat(sides(a));
+}
+
+/* ---------- Cards ---------- */
+const CATS = {
+  basic:  'Power & sail',
+  tow:    'Towing',
+  status: 'NUC, RAM & CBD',
+  fish:   'Fishing & pilot',
+  anchor: 'Anchored & aground',
+  special:'Specialist'
+};
+
+const CARDS = [
+  { cat:'basic', type:'Power-driven vessel under 50 m, underway', aspect:'head',
+    lights: power('head'),
+    view:'Head-on. You can see both sidelights, so she is coming straight at you.',
+    text:'One white masthead light with red and green sidelights. A power vessel under 50 m only needs one masthead light, though she may carry a second.',
+    mnem:'Seeing red and green together means she is heading straight at you.',
+    tip:'Head-on with another power vessel, both of you alter course to starboard (Rule 14).',
+    rule:'Rule 23(a)' },
+  { cat:'basic', type:'Power-driven vessel under 50 m, underway', aspect:'stbd',
+    lights: power('stbd'),
+    view:'You can see her starboard side, and she is crossing from your left to your right.',
+    text:'One white masthead light and a green sidelight.',
+    mnem:'"Green to green, or red to red, perfect safety, go ahead."',
+    tip:'If she is on your port side and crossing, she is the stand-on vessel. Keep a watch and be ready to act.',
+    rule:'Rule 23(a)' },
+  { cat:'basic', type:'Power-driven vessel 50 m or over, underway', aspect:'port',
+    lights: power('port', true),
+    view:'You can see her port side, and she is crossing from your right to your left.',
+    text:'Two white masthead lights, with the aft one higher, plus a red sidelight. The masthead pair tells you her heading, because the lower light is forward.',
+    mnem:'The low masthead light marks the bow.',
+    tip:'A power vessel crossing from your starboard side is the one you give way to (Rule 15).',
+    rule:'Rule 23(a)(ii)' },
+  { cat:'basic', type:'Power-driven vessel 50 m or over, underway', aspect:'head',
+    lights: power('head', true),
+    view:'Head-on. Her masthead lights are in line, one above the other, and you can see both sidelights.',
+    text:'Two white masthead lights set well apart vertically, plus red and green sidelights. If the masthead lights start to open out, she is turning.',
+    mnem:'Masthead lights in line with red and green below: a big ship pointing at you.',
+    tip:'Don\'t mistake this for towing lights. Towing masthead lights are close together, while a ship\'s forward and aft masthead lights are far apart.',
+    rule:'Rule 23(a)(ii)' },
+  { cat:'basic', type:'Vessel underway, seen from astern', aspect:'stern', lookalike:'lone-white',
+    lights: power('stern'),
+    view:'You are astern of her. She is heading away from you.',
+    text:'A single white sternlight, low down. Sail, power and fishing vessels all show one, so from astern you can\'t tell her type.',
+    mnem:'One low white light with nothing else: you\'re looking at her stern.',
+    tip:'If you are overtaking, you keep clear until you are past and clear (Rule 13).',
+    rule:'Rule 21(c)' },
+  { cat:'basic', type:'Sailing vessel underway', aspect:'head',
+    lights: sides('head'),
+    view:'Head-on. She is coming straight at you.',
+    text:'Red and green sidelights with no white masthead light. The missing masthead light tells you she is under sail.',
+    mnem:'Red and green with no white above: a sailing vessel.',
+    tip:'If she is motor-sailing, she shows a masthead light and counts as a power-driven vessel.',
+    rule:'Rule 25(a)' },
+  { cat:'basic', type:'Sailing vessel underway', aspect:'port',
+    lights: [['r',100,12]],
+    view:'You can see her port side, and she is crossing from right to left.',
+    text:'A single red light high up. This is a masthead tricolour, which sailing vessels under 20 m may use instead of separate sidelights and a sternlight.',
+    mnem:'One coloured light high on the mast: a yacht with a tricolour.',
+    tip:'A tricolour must never be switched on while motoring.',
+    rule:'Rule 25(b)' },
+  { cat:'basic', type:'Sailing vessel underway', aspect:'stbd',
+    lights: stack('stbd', ['r','g'], 100).map(l => [l[0], l[1], l[2]-8]).concat(sides('stbd')),
+    view:'You can see her starboard side, and she is crossing from left to right.',
+    text:'All-round red over green at the masthead, which is optional, plus a green sidelight. This combination can\'t be used together with a tricolour.',
+    mnem:'"Red over green, sailing machine."',
+    tip:'Mostly seen on larger sailing vessels.',
+    rule:'Rule 25(c)' },
+
+  { cat:'tow', type:'Power-driven vessel towing, tow 200 m or less', aspect:'head',
+    lights: towing('head', 2),
+    view:'Head-on. She is coming straight at you.',
+    text:'Two white masthead lights close together vertically, plus sidelights. Two lights means the tow is 200 m or less, measured from her stern to the end of the tow.',
+    mnem:'Two whites close together: a tug with a short tow.',
+    tip:'Look for the tow behind her, and never pass between a tug and her tow.',
+    rule:'Rule 24(a)' },
+  { cat:'tow', type:'Power-driven vessel towing, tow over 200 m', aspect:'stbd',
+    lights: towing('stbd', 3),
+    view:'You can see her starboard side, and she is crossing from left to right.',
+    text:'Three white masthead lights close together vertically, plus a green sidelight. Three lights means the tow is more than 200 m long.',
+    mnem:'Three whites in a line: a long tow behind.',
+    tip:'By day she shows a diamond shape. The tow could be a long way astern, so give her plenty of room.',
+    rule:'Rule 24(a)' },
+  { cat:'tow', type:'Power-driven vessel towing, seen from astern', aspect:'stern',
+    lights: towing('stern'),
+    view:'You are astern of her.',
+    text:'A yellow towing light above the white sternlight. It has the same 135° arc as the sternlight.',
+    mnem:'"Yellow over white, towing tonight."',
+    tip:'The vessel being towed will be somewhere between you and the tug.',
+    rule:'Rule 24(a)(iv)' },
+  { cat:'tow', type:'Tug towing, with the vessel being towed', aspect:'port',
+    hulls: [{a:'port', cx:55, w:30}, {a:'port', cx:145, w:40}],
+    lights: [['w',40,55], ['w',40,48], ['r',32,84], ['r',112,84]],
+    view:'You can see the port side of both, and they are moving from right to left.',
+    text:'The tug on the left shows two towing masthead lights and a red sidelight. The vessel being towed has no masthead light, so she shows only her sidelights and a sternlight.',
+    mnem:'A red light with nothing above it, trailing a tug: that\'s the tow.',
+    tip:'Never cross between them, because the tow line may be just under the surface.',
+    rule:'Rule 24(e)' },
+
+  { cat:'status', type:'Not under command, making way', aspect:'port',
+    lights: stack('port', ['r','r']).concat(sides('port')),
+    view:'You can see her port side, and she is moving from right to left.',
+    text:'Two all-round red lights, one above the other, plus sidelights and a sternlight. She shows no masthead light, because she can\'t manoeuvre as required.',
+    mnem:'"Red over red, the captain is dead."',
+    tip:'Almost every other vessel must keep clear of her (Rule 18).',
+    rule:'Rule 27(a)' },
+  { cat:'status', type:'Not under command, not making way', aspect:'head',
+    lights: stack('head', ['r','r']),
+    view:'She is stopped in the water, so there is no heading to read.',
+    text:'Two all-round red lights, one above the other, and nothing else. She has switched off her sidelights and sternlight because she is not making way.',
+    mnem:'"Red over red, the captain is dead."',
+    tip:'By day she shows two black balls, one above the other.',
+    rule:'Rule 27(a)' },
+  { cat:'status', type:'Restricted in ability to manoeuvre, making way', aspect:'head',
+    lights: stack('head', ['r','w','r']).concat(power('head')),
+    view:'Head-on. She is coming straight at you.',
+    text:'All-round red, white, red in a vertical line, plus a masthead light and sidelights. Her work, such as laying cable, servicing a buoy or surveying, limits how she can manoeuvre.',
+    mnem:'"Red, white, red, restricted ahead."',
+    tip:'By day she shows ball, diamond, ball. Keep clear of her.',
+    rule:'Rule 27(b)' },
+  { cat:'status', type:'Constrained by her draught', aspect:'head',
+    lights: stack('head', ['r','r','r']).concat(power('head', true)),
+    view:'Head-on. She is coming straight at you.',
+    text:'Three all-round red lights in a vertical line, plus her normal power-driven lights. She can\'t leave the deep-water channel.',
+    mnem:'"Three reds in a line, deep draught, she\'s fine," so long as you keep out of her way.',
+    tip:'By day she shows a cylinder. Don\'t impede her passage (Rule 18(d)).',
+    rule:'Rule 28' },
+
+  { cat:'fish', type:'Trawling, making way', aspect:'head',
+    lights: stack('head', ['g','w']).concat(sides('head')),
+    view:'Head-on. She is coming straight at you.',
+    text:'All-round green over white, plus sidelights. A trawler of 50 m or over must also carry a masthead light, set aft of and higher than the green light.',
+    mnem:'"Green over white, trawling tonight."',
+    tip:'Power and sailing vessels must keep clear of a vessel engaged in fishing (Rule 18).',
+    rule:'Rule 26(b)' },
+  { cat:'fish', type:'Trawling, not making way', aspect:'head',
+    lights: stack('head', ['g','w']),
+    view:'She is stopped in the water, so there is no heading to read.',
+    text:'All-round green over white only. She has switched off her sidelights and sternlight because she is not making way.',
+    mnem:'"Green over white, trawling tonight."',
+    tip:'By day she shows two cones, points together.',
+    rule:'Rule 26(b)' },
+  { cat:'fish', type:'Fishing (not trawling), making way', aspect:'stbd',
+    lights: stack('stbd', ['r','w']).concat(sides('stbd')),
+    view:'You can see her starboard side, and she is moving from left to right.',
+    text:'All-round red over white, plus a green sidelight. She is fishing with nets or lines, not a trawl.',
+    mnem:'"Red over white, fishing at night."',
+    tip:'If her gear extends more than 150 m, she also shows an all-round white light in the direction of the gear.',
+    rule:'Rule 26(c)' },
+  { cat:'fish', type:'Pilot vessel on duty, underway', aspect:'head',
+    lights: stack('head', ['w','r']).concat(sides('head')),
+    view:'Head-on. She is coming straight at you.',
+    text:'All-round white over red at the masthead, plus sidelights.',
+    mnem:'"White over red, pilot ahead."',
+    tip:'At anchor she also shows anchor lights. Off duty, she shows normal power-driven lights.',
+    rule:'Rule 29' },
+
+  { cat:'anchor', type:'At anchor, under 50 m', aspect:'head', lookalike:'lone-white',
+    lights: [['w',100,50]],
+    view:'She is anchored, so there is no heading to read.',
+    text:'A single all-round white light placed where it can best be seen, usually in the forepart. Because it\'s all-round, it doesn\'t change as you move around her.',
+    mnem:'One white light that stays the same from every angle: a vessel at anchor.',
+    tip:'By day she shows one black ball. Vessels under 7 m anchored away from channels and anchorages don\'t need lights.',
+    rule:'Rule 30(b)' },
+  { cat:'anchor', type:'At anchor, 50 m or over', aspect:'stbd',
+    lights: [['w',145,45], ['w',60,62]],
+    view:'She is anchored, and you are looking at her side.',
+    text:'Two all-round white lights: a forward one, higher, and an aft one, lower. Vessels of 100 m or over must also light up their decks, and smaller vessels may.',
+    mnem:'At anchor the forward light is the high one. It\'s the opposite of masthead lights underway.',
+    tip:'A ship lit up with deck lights like a small town is usually at anchor.',
+    rule:'Rule 30(a)' },
+  { cat:'anchor', type:'Aground, under 50 m', aspect:'head',
+    lights: stack('head', ['r','r']).concat([['w',100,50]]),
+    view:'She is aground, so there is no heading to read.',
+    text:'Anchor light plus two all-round red lights, one above the other.',
+    mnem:'"Red over red with a white below, she\'s aground, so don\'t go."',
+    tip:'The water here is shallow for her, so it may be for you too. By day she shows three black balls.',
+    rule:'Rule 30(d)' },
+
+  { cat:'special', type:'Mine clearance vessel, underway', aspect:'head',
+    lights: [['g',100,22], ['g',86,30], ['g',114,30]].concat(power('head')),
+    view:'Head-on. She is coming straight at you.',
+    text:'Three all-round green lights in a triangle, one at the foremast head and one at each yardarm, plus normal power-driven lights.',
+    mnem:'Three greens in a triangle: danger, stay 1000 m away.',
+    tip:'Don\'t approach within 1000 m of a vessel engaged in mine clearance.',
+    rule:'Rule 27(f)' },
+  { cat:'special', type:'Air-cushion vessel (hovercraft), non-displacement mode', aspect:'head',
+    lights: [['fy',100,40]].concat(power('head')),
+    view:'Head-on. She is coming straight at you.',
+    text:'An all-round flashing yellow light plus normal power-driven lights.',
+    mnem:'Flashing yellow: a hovercraft, and she is fast.',
+    tip:'She may close on you much faster than you\'d expect.',
+    rule:'Rule 23(b)' },
+  { cat:'special', type:'Dredging, restricted in ability to manoeuvre, making way', aspect:'head',
+    lights: stack('head', ['r','w','r']).concat(power('head'),
+      [['r',128,60], ['r',128,68], ['g',72,60], ['g',72,68]]),
+    view:'Head-on. She is coming straight at you.',
+    text:'Red-white-red restricted lights with power-driven lights, plus two reds on the side with the obstruction (her port side) and two greens on the side where you can pass safely (her starboard side).',
+    mnem:'"Two greens, go between. Two reds, danger ahead." Pass on the green side.',
+    tip:'By day she shows two balls on the obstructed side and two diamonds on the side where you can pass.',
+    rule:'Rule 27(d)' },
+];
+CARDS.forEach((c,i) => c.id = i);
+
+const ASPECT_LABEL = { head:'Bow-on', stbd:'Starboard side', port:'Port side', stern:'From astern' };
+
+/* ---------- Drawing ---------- */
+function hullPath(a, cx, w) {
+  const d = 86, k = 96;
+  if (a === 'head' || a === 'stern') {
+    const hw = w ?? 18;
+    return `M${cx-hw},${d} L${cx+hw},${d} L${cx+hw*0.7},${k} L${cx-hw*0.7},${k} Z`;
+  }
+  const hw = w ?? 55;
+  // bow on the right for stbd, on the left for port
+  const bow = a === 'stbd' ? cx + hw : cx - hw, st = a === 'stbd' ? cx - hw : cx + hw;
+  const s = a === 'stbd' ? 1 : -1;
+  return `M${st},${d} L${bow},${d-3} L${bow - s*10},${k} L${st + s*2},${k} Z`;
+}
+
+function sceneSVG(card, reveal) {
+  const hulls = card.hulls || [{ a: card.aspect, cx: 100 }];
+  let hullSVG = '';
+  if (reveal) {
+    hulls.forEach(h => { hullSVG += `<path d="${hullPath(h.a, h.cx, h.w)}" fill="#26324d" stroke="#3b4a6e" stroke-width=".6"/>`; });
+    // a mast line under each column of lights above deck
+    const tops = {};
+    card.lights.forEach(([, x, y]) => { if (y < 78) { const k = Math.round(x); tops[k] = Math.min(tops[k] ?? 99, y); } });
+    Object.entries(tops).forEach(([x, y]) => {
+      hullSVG += `<line x1="${x}" y1="${y+3}" x2="${x}" y2="86" stroke="#3b4a6e" stroke-width="1.2"/>`;
+    });
+  }
+  const lights = card.lights.map(([c, x, y]) => {
+    const col = COL[c];
+    const blink = c === 'fy' ? `<animate attributeName="opacity" values="1;1;0.08;0.08" keyTimes="0;0.45;0.5;1" dur="1s" repeatCount="indefinite"/>` : '';
+    return `<g>${blink}<circle cx="${x}" cy="${y}" r="7" fill="${col}" opacity=".28" filter="url(#glow)"/>
+      <circle cx="${x}" cy="${y}" r="2.4" fill="${col}"/><circle cx="${x}" cy="${y}" r="1" fill="#fff" opacity=".85"/></g>`;
+  }).join('');
+  return `<svg class="scene" viewBox="0 0 200 120" role="img" aria-label="${reveal ? card.type : 'Lights seen at night'}">
+    <defs>
+      <filter id="glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="2.5"/></filter>
+      <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0c1830"/><stop offset="1" stop-color="#050a15"/></linearGradient>
+    </defs>
+    <rect width="200" height="96" fill="#03060d"/>
+    <circle cx="18" cy="14" r=".5" fill="#fff" opacity=".5"/><circle cx="170" cy="9" r=".5" fill="#fff" opacity=".4"/>
+    <circle cx="150" cy="30" r=".4" fill="#fff" opacity=".35"/><circle cx="40" cy="40" r=".4" fill="#fff" opacity=".3"/>
+    <rect y="96" width="200" height="24" fill="url(#sea)"/>
+    <line x1="0" y1="96" x2="200" y2="96" stroke="#1b2a48" stroke-width=".5"/>
+    ${hullSVG}${lights}
+  </svg>`;
+}
+
+/* ---------- State ---------- */
+const $ = id => document.getElementById(id);
+const selected = new Set(Object.keys(CATS));
+let deck = [], idx = 0, score = 0, missed = [], answered = false;
+
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+function renderCats() {
+  $('cats').innerHTML = Object.entries(CATS).map(([k, v]) => {
+    const n = CARDS.filter(c => c.cat === k).length;
+    return `<button class="chip" data-cat="${k}" aria-pressed="${selected.has(k)}">${v} · ${n}</button>`;
+  }).join('');
+  const n = CARDS.filter(c => selected.has(c.cat)).length;
+  $('start').textContent = `Start (${n} cards)`;
+  $('start').disabled = n === 0;
+}
+$('cats').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  const k = b.dataset.cat;
+  selected.has(k) ? selected.delete(k) : selected.add(k);
+  renderCats();
+});
+
+function choicesFor(card) {
+  const seen = new Set([card.type]);
+  const pool = shuffle(CARDS.filter(c => c.type !== card.type && !(card.lookalike && c.lookalike === card.lookalike)));
+  pool.sort((a, b) => (b.cat === card.cat) - (a.cat === card.cat));   // same-category distractors first (harder)
+  const opts = [card.type];
+  for (const c of pool) { if (opts.length === 4) break; if (!seen.has(c.type)) { seen.add(c.type); opts.push(c.type); } }
+  return shuffle(opts);
+}
+
+function start(cards) {
+  deck = shuffle(cards.slice()); idx = 0; score = 0; missed = [];
+  $('modal').classList.add('open');
+  showCard();
+}
+
+function showCard() {
+  answered = false;
+  const card = deck[idx], mc = $('mc').checked;
+  $('dtitle').textContent = `Card ${idx + 1} of ${deck.length}`;
+  $('score').textContent = `Score ${score}`;
+  $('bar').style.width = `${(idx / deck.length) * 100}%`;
+  const opts = mc ? choicesFor(card) : [];
+  $('stage').innerHTML = `
+    <div class="card" id="card">
+      <div class="card-inner">
+        <div class="face front">
+          ${sceneSVG(card, false)}
+          <div class="body">
+            <p class="q">What vessel is this, and which way is she heading?</p>
+            <p class="hint">${mc ? 'Pick an answer, or turn the card over.' : 'Make your guess, then turn the card over.'}</p>
+            ${mc ? `<div class="choices">${opts.map((o, i) => `<button class="choice" data-opt="${o}"><kbd>${i + 1}</kbd>${o}</button>`).join('')}</div>` : ''}
+          </div>
+        </div>
+        <div class="face back">
+          ${sceneSVG(card, true)}
+          <div class="body">
+            <div class="verdict" id="verdict"></div>
+            <p class="ans-title">${card.type}</p>
+            <p class="aspect">${ASPECT_LABEL[card.aspect]}: ${card.view}</p>
+            <p>${card.text}</p>
+            <p class="mnem">${card.mnem}</p>
+            <p>${card.tip}</p>
+            <p class="rule">COLREGs ${card.rule}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="actions" id="actions">
+      <button class="btn primary" id="flip">Turn card</button>
+    </div>`;
+  $('card').addEventListener('click', e => {
+    const ch = e.target.closest('.choice');
+    if (ch) return guess(ch.dataset.opt);
+    if (e.target.closest('.scene')) flip();
+  });
+  $('flip').addEventListener('click', flip);
+}
+
+function guess(opt) {
+  if (answered) return;
+  answered = true;
+  const card = deck[idx], ok = opt === card.type;
+  document.querySelectorAll('.choice').forEach(b => {
+    b.disabled = true;
+    if (b.dataset.opt === card.type) b.classList.add('right');
+    else if (b.dataset.opt === opt) b.classList.add('wrong');
+  });
+  record(ok);
+  setTimeout(flip, 650);
+}
+
+function record(ok) {
+  if (ok) score++; else missed.push(deck[idx]);
+  $('score').textContent = `Score ${score}`;
+  const v = $('verdict');
+  v.textContent = ok ? '✓ Correct' : '✗ Not quite';
+  v.className = 'verdict ' + (ok ? 'good' : 'bad');
+}
+
+function flip() {
+  const card = $('card');
+  if (card.classList.contains('flipped')) { card.classList.remove('flipped'); return; }
+  card.classList.add('flipped');
+  const actions = $('actions');
+  if (answered) showNext();
+  else {
+    // self-marking when no multiple-choice guess was made
+    actions.innerHTML = `<button class="btn bad" id="miss">I missed it</button><button class="btn good" id="got">I got it</button>`;
+    const mark = ok => { answered = true; record(ok); showNext(); };
+    $('miss').addEventListener('click', () => mark(false));
+    $('got').addEventListener('click', () => mark(true));
+  }
+}
+
+function showNext() {
+  $('actions').innerHTML = `<button class="btn primary" id="next">${idx === deck.length - 1 ? 'Finish' : 'Next card'}</button>`;
+  $('next').addEventListener('click', next);
+}
+
+function next() {
+  if (!answered) return;
+  if (idx < deck.length - 1) { idx++; showCard(); } else finish();
+}
+
+function finish() {
+  $('bar').style.width = '100%';
+  $('dtitle').textContent = 'Deck complete';
+  const pct = Math.round((score / deck.length) * 100);
+  try { localStorage.setItem('nightlights-last', `${score}/${deck.length} (${pct}%)`); } catch (e) {}
+  showLast();
+  $('stage').innerHTML = `<div class="summary">
+    <h3>${score} / ${deck.length} correct (${pct}%)</h3>
+    ${missed.length ? `<p>Worth another look:</p><ul>${missed.map(c => `<li>${c.type} (${ASPECT_LABEL[c.aspect].toLowerCase()})</li>`).join('')}</ul>` : '<p>A clean sweep. Nicely done.</p>'}
+    <div class="actions">
+      ${missed.length ? '<button class="btn" id="retry">Retry missed</button>' : ''}
+      <button class="btn primary" id="again">New round</button>
+    </div></div>`;
+  const miss = missed.slice();
+  if (miss.length) $('retry').addEventListener('click', () => start(miss));
+  $('again').addEventListener('click', () => start(CARDS.filter(c => selected.has(c.cat))));
+}
+
+function close() { $('modal').classList.remove('open'); }
+function showLast() {
+  let v = null; try { v = localStorage.getItem('nightlights-last'); } catch (e) {}
+  $('last').textContent = v ? `Last round: ${v}` : '';
+}
+
+$('start').addEventListener('click', () => start(CARDS.filter(c => selected.has(c.cat))));
+$('close').addEventListener('click', close);
+$('modal').addEventListener('click', e => { if (e.target === $('modal')) close(); });
+document.addEventListener('keydown', e => {
+  if (!$('modal').classList.contains('open')) return;
+  if (e.key === 'Escape') return close();
+  if (!$('card')) return;
+  const flipped = $('card').classList.contains('flipped');
+  if (/^[1-4]$/.test(e.key) && !answered) {
+    const b = document.querySelectorAll('.choice')[+e.key - 1]; if (b) guess(b.dataset.opt);
+  } else if (e.key === ' ' || e.key === 'Enter') {
+    e.preventDefault();
+    if (answered && flipped) next(); else flip();
+  } else if (e.key === 'ArrowRight' && answered) next();
+});
+
+renderCats();
+showLast();
+</script>
+</body>
+</html>
